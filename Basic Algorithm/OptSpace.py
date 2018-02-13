@@ -3,23 +3,31 @@ import numpy as np
 import scipy.sparse
 from scipy.sparse.linalg import norm
 
+from functools import reduce
+import operator
+
 def getoptS(X,Y,M_E,E):
     nxr = np.shape(X)
     print(np.shape(np.matrix.transpose(X)))
-    print(np.shape(M_E))
+    print(np.shape(M_E.todense()))
     print(np.shape(Y))
-    print(np.shape(np.dot(M_E,Y.T)))
+    print(np.shape(np.matmul(X.T,M_E.todense())))
 
-    C = np.dot(X,np.dot(M_E,Y.T))
-    print(np.shape(C))
-    #print(X[:,0])
-    #print(np.array([Y[:,0]]).T)
-    #print(np.shape(np.matmul(X[:,0],np.array([Y[0,:]]).T)))
+
+    C = np.matmul(np.matmul(X.T,M_E.todense()),Y.T)
+    Cnxm = np.shape(C)
+    CnxmN = Cnxm[0]*Cnxm[1]
+    C = np.array(C.flatten())[0]
+    A = np.array([[0 for i in range(CnxmN)]for j in range(CnxmN)])
+
     for i in range(nxr[1]):
         for j in range(nxr[1]):
             ind = j*nxr[1] +i;
-            #temp = (X[:,i] *np.matrix.transpose(Y[:,j]))
-            #print(temp)
+            temp = np.matmul(np.matmul(X.T,np.multiply(np.matmul(np.array([X[:,i]]).T,np.array([Y[j,:]])),E.todense())),Y.T)
+            A[:,ind] = np.array(temp.flatten())[0]
+    S = np.linalg.solve(A, C)
+    return np.reshape(S,(nxr[1],nxr[1]))
+
 
 
 def OptSpace(M,rank,num_iter,tol):
@@ -71,12 +79,12 @@ def OptSpace(M,rank,num_iter,tol):
     X0, S0, Y0 = scipy.sparse.linalg.svds(M_t, rank);
     X0 = X0 * np.sqrt(nxm[0])
     Y0 = Y0 * np.sqrt(nxm[1])
-    np.dot(np.dot(S0,X0),Y0.T)
+
     S0 = S0 / eps;
 
     X = X0
     Y = Y0
-    getoptS(X,Y,M,E)
+    S = getoptS(X,Y,M,E)
 
 indptr = np.array([0, 2, 3, 6])
 indices = np.array([0, 2, 2, 0, 1, 2])
