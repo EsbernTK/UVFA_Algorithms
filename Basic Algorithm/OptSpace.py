@@ -8,13 +8,7 @@ import operator
 
 def getoptS(X,Y,M_E,E):
     nxr = np.shape(X)
-    print(np.shape(np.matrix.transpose(X)))
-    print(np.shape(M_E.todense()))
-    print(np.shape(Y))
-    print(np.shape(np.matmul(X.T,M_E.todense())))
-
-
-    C = np.matmul(np.matmul(X.T,M_E.todense()),Y.T)
+    C = np.matmul(np.matmul(X.conj().T,M_E.todense()),Y.T)
     Cnxm = np.shape(C)
     CnxmN = Cnxm[0]*Cnxm[1]
     C = np.array(C.flatten())[0]
@@ -23,12 +17,29 @@ def getoptS(X,Y,M_E,E):
     for i in range(nxr[1]):
         for j in range(nxr[1]):
             ind = j*nxr[1] +i;
-            temp = np.matmul(np.matmul(X.T,np.multiply(np.matmul(np.array([X[:,i]]).T,np.array([Y[j,:]])),E.todense())),Y.T)
+            temp = np.matmul(np.matmul(X.conj().T,np.multiply(np.matmul(np.array([X[:,i]]).T,np.array([Y[j,:]]).conj()),E.todense())),Y.conj().T)
             A[:,ind] = np.array(temp.flatten())[0]
     S = np.linalg.solve(A, C)
     return np.reshape(S,(nxr[1],nxr[1]))
 
+def Gp(X,m0,r):
+    z = 1
 
+def gradF_t(X,Y,S,M,E,m0,rho):
+    nxr = np.shape(X)
+    mxr = np.shape(Y)
+
+    XS = np.matmul(X,S)
+    YS = np.matmul(Y.conj().T,S.conj().T)
+    XSY = np.matmul(XS,Y)
+
+    Qx = np.matmul(X.conj().T,np.matmul(np.multiply(M.todense()-XSY,E.todense()),YS))/nxr[0]
+    Qy = np.matmul(Y.conj(), np.matmul(np.multiply(M.todense() - XSY, E.todense()).conj().T, XS)) / mxr[0]
+
+    W = np.matmul(np.multiply(XSY-M.todense(),E.todense()),YS) + np.matmul(X,Qx)
+    Z = np.matmul(np.multiply(XSY-M.todense(),E.todense()).conj().T,XS) + np.matmul(Y.T,Qy)
+
+    return W, Z
 
 def OptSpace(M,rank,num_iter,tol):
     #tol stops the algorithm if the distance is lower than tol
@@ -85,6 +96,11 @@ def OptSpace(M,rank,num_iter,tol):
     X = X0
     Y = Y0
     S = getoptS(X,Y,M,E)
+    dist = np.linalg.norm(np.multiply((M - np.matmul(np.matmul(X,S),Y.conj())),E.todense()))/np.sqrt(E.nnz)
+    print("Initial Dist:", dist)
+
+    for i in range(num_iter):
+        W,Z = gradF_t(X,Y,S,M,E,m0,rho)
 
 indptr = np.array([0, 2, 3, 6])
 indices = np.array([0, 2, 2, 0, 1, 2])
