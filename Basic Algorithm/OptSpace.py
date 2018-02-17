@@ -1,14 +1,48 @@
 from scipy.sparse import *
 import numpy as np
+from numpy import matlib
 import scipy.sparse
 from scipy.sparse.linalg import norm
 
+import time
 from functools import reduce
 import operator
+def G(X,m0,r):
+
+    z = np.sum(X**2,1)/(2*m0*r)
+    y = np.exp((z - 1)** 2) - 1;
+
+    for ind,val in enumerate(np.nonzero(z<1)[0]):
+        y[val] = 0
+
+    return sum(y)
+def F_t(X,Y,S,M,E,m0,rho):
+    nxr = np.shape(X)
+    out1 = sum(sum(((np.array((np.matmul(X, np.matmul(S, Y.T))) - M) * np.array(E.todense())) ** 2))) / 2
+    out2 = rho*G(Y,m0,r)
+
+    out3 = rho*G(X,m0,r)
+
+    return out1+out2+out3
+def getoptT(X,W,Y,Z,S,M,E,m0,rho):
+    norm2WZ = np.power(np.linalg.norm(W, 'fro'),2) + np.power(np.linalg.norm(Z, 'fro'),2);
+    f = [F_t(X,Y,S,M,E,m0,rho)]
+    t = -0.1
+    for i in range(20):
+
+        f.append(F_t(np.array(X +t*W),np.array(Y + t*Z),S,M,E,m0,rho))
+        print(f[i+1] - f[0])
+        if(f[i+1] - f[0] <= 0.5*(t)*norm2WZ):
+            print(t)
+            return t;
+        t /= 2
+    return t
+
+
 
 def getoptS(X,Y,M_E,E):
     nxr = np.shape(X)
-    C = np.matmul(np.matmul(X.conj().T,M_E.todense()),Y.T)
+    C = np.matmul(X.T,np.matmul(M_E.todense(),Y))
     Cnxm = np.shape(C)
     CnxmN = Cnxm[0]*Cnxm[1]
     C = np.array(C.flatten())[0]
@@ -17,27 +51,33 @@ def getoptS(X,Y,M_E,E):
     for i in range(nxr[1]):
         for j in range(nxr[1]):
             ind = j*nxr[1] +i;
-            temp = np.matmul(np.matmul(X.conj().T,np.multiply(np.matmul(np.array([X[:,i]]).T,np.array([Y[j,:]]).conj()),E.todense())),Y.conj().T)
+
+            temp = np.matmul(X.T,np.matmul(np.multiply(np.matmul(np.array([X[:,i]]).T,np.array([Y[:,j]])),E.todense()),Y))
             A[:,ind] = np.array(temp.flatten())[0]
     S = np.linalg.solve(A, C)
     return np.reshape(S,(nxr[1],nxr[1]))
 
 def Gp(X,m0,r):
-    z = 1
+    z = np.sum(X**2,1)/(2*m0*r)
+    z = 2 * np.exp((z-1)**2) * (z-1)
+    for ind,val in enumerate(np.nonzero(z)[0]):
+        if(z[val] < 0):
+            z[val] = 0
+    return X * np.matlib.repmat(z,r,1).T / (m0*r)
 
 def gradF_t(X,Y,S,M,E,m0,rho):
     nxr = np.shape(X)
-    mxr = np.shape(Y)
+    rxm = np.shape(Y)
 
     XS = np.matmul(X,S)
-    YS = np.matmul(Y.conj().T,S.conj().T)
-    XSY = np.matmul(XS,Y)
+    YS = np.matmul(Y,S.T)
+    XSY = np.matmul(XS,Y.T)
 
-    Qx = np.matmul(X.conj().T,np.matmul(np.multiply(M.todense()-XSY,E.todense()),YS))/nxr[0]
-    Qy = np.matmul(Y.conj(), np.matmul(np.multiply(M.todense() - XSY, E.todense()).conj().T, XS)) / mxr[0]
+    Qx = np.matmul(X.T,np.matmul(np.multiply(M.todense()-XSY,E.todense()),YS))/nxr[0]
+    Qy = np.matmul(Y.T, np.matmul(np.multiply(M.todense() - XSY, E.todense()).T, XS)) / rxm[1]
 
-    W = np.matmul(np.multiply(XSY-M.todense(),E.todense()),YS) + np.matmul(X,Qx)
-    Z = np.matmul(np.multiply(XSY-M.todense(),E.todense()).conj().T,XS) + np.matmul(Y.T,Qy)
+    W = np.matmul(np.multiply(XSY-M.todense(),E.todense()),YS) + np.matmul(X,Qx) + rho*Gp(X,m0,nxr[1])
+    Z = np.matmul(np.multiply(XSY-M.todense(),E.todense()).T,XS) + np.matmul(Y,Qy) + rho*Gp(Y,m0,nxr[1])
 
     return W, Z
 
@@ -79,6 +119,8 @@ def OptSpace(M,rank,num_iter,tol):
     #print(d)
     d_ = np.mean(d);
     #print(d_,2*d_)
+
+
     for idx,val in enumerate(d):
         if(val[0] > 2*d_):
             list1 = M.getrow(idx).nonzero()[1]
@@ -88,6 +130,7 @@ def OptSpace(M,rank,num_iter,tol):
     #print(M_t)
 
     X0, S0, Y0 = scipy.sparse.linalg.svds(M_t, rank);
+    Y0 = Y0.T
     X0 = X0 * np.sqrt(nxm[0])
     Y0 = Y0 * np.sqrt(nxm[1])
 
@@ -95,19 +138,48 @@ def OptSpace(M,rank,num_iter,tol):
 
     X = X0
     Y = Y0
+    print(np.shape(X),np.shape(Y))
     S = getoptS(X,Y,M,E)
-    dist = np.linalg.norm(np.multiply((M - np.matmul(np.matmul(X,S),Y.conj())),E.todense()))/np.sqrt(E.nnz)
+    dist = [np.linalg.norm(np.multiply((M - np.matmul(X,np.matmul(S,Y.T))),E.todense()))/np.sqrt(E.nnz)]
     print("Initial Dist:", dist)
 
     for i in range(num_iter):
         W,Z = gradF_t(X,Y,S,M,E,m0,rho)
+        t = getoptT(X, W, Y, Z, S, M, E, m0, rho)
+        X = np.array(X + t * W);
+        Y = np.array(Y + t * Z);
+        S = getoptS(X, Y, M, E);
+        dist.append(np.linalg.norm(np.multiply((M - np.matmul(X,np.matmul(S,Y.T))),E.todense()))/np.sqrt(E.nnz))
+        print("At iteration",i,"the error is: ",dist[i+1])
+        if (dist[i + 1] < tol):
+            break;
+    S = S/rescal_param
+    return X,S,Y,dist
+
 
 indptr = np.array([0, 2, 3, 6])
 indices = np.array([0, 2, 2, 0, 1, 2])
 data = np.array([1, 2, 3, 4, 5, 6]).repeat(4).reshape(6, 2, 2)
 bsr_matrix((data,indices,indptr), shape=(6, 6)).toarray()
 
+n = 1001;
+m = 1000;
+r = 3;
+tol = 1e-8 ;
 
-M = [[0,0,0,1,0,0,0,1],[0,0,0,3,0,0,0,1],[1,0,0,0,0,0,0,1],[0,0,2,1,0,0,0,1],[7,5,2,1,2,3,5,6],[0,5,0,0,0,0,5,6],[0,5,2,1,0,0,0,0],[0,5,2,1,0,0,0,0],[0,5,2,1,0,0,0,0]]
+np.random.seed(2)
+eps = 10*r*np.log10(n);
+U = np.random.randn(n,r);
+V = np.random.randn(m,r);
+sig = np.eye(r)
+M0 = np.matmul(U,np.matmul(sig,V.T))
+E = 1 - np.ceil(np.random.rand(n,m) - (eps/np.sqrt(n*m)))
 
-OptSpace(M,3,10,1)
+M = M0 * E
+np.random.seed((int)(time.time()))
+
+
+
+X,S,Y,dist = OptSpace(M,r,10,tol)
+
+print(np.linalg.norm(np.matmul(X,np.matmul(S,Y.T)) - M0,'fro')/np.sqrt(m*n))
