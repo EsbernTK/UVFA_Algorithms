@@ -25,13 +25,13 @@ def F_t(X,Y,S,M,E,m0,rho):
 
     return out1+out2+out3
 def getoptT(X,W,Y,Z,S,M,E,m0,rho):
+
     norm2WZ = np.power(np.linalg.norm(W, 'fro'),2) + np.power(np.linalg.norm(Z, 'fro'),2);
     f = [F_t(X,Y,S,M,E,m0,rho)]
     t = -0.1
     for i in range(20):
 
         f.append(F_t(np.array(X +t*W),np.array(Y + t*Z),S,M,E,m0,rho))
-        print(f[i+1] - f[0])
         if(f[i+1] - f[0] <= 0.5*(t)*norm2WZ):
             print(t)
             return t;
@@ -67,14 +67,14 @@ def Gp(X,m0,r):
 
 def gradF_t(X,Y,S,M,E,m0,rho):
     nxr = np.shape(X)
-    rxm = np.shape(Y)
+    mxr = np.shape(Y)
 
     XS = np.matmul(X,S)
     YS = np.matmul(Y,S.T)
     XSY = np.matmul(XS,Y.T)
 
     Qx = np.matmul(X.T,np.matmul(np.multiply(M.todense()-XSY,E.todense()),YS))/nxr[0]
-    Qy = np.matmul(Y.T, np.matmul(np.multiply(M.todense() - XSY, E.todense()).T, XS)) / rxm[1]
+    Qy = np.matmul(Y.T, np.matmul(np.multiply(M.todense() - XSY, E.todense()).T, XS)) / mxr[0]
 
     W = np.matmul(np.multiply(XSY-M.todense(),E.todense()),YS) + np.matmul(X,Qx) + rho*Gp(X,m0,nxr[1])
     Z = np.matmul(np.multiply(XSY-M.todense(),E.todense()).T,XS) + np.matmul(Y,Qy) + rho*Gp(Y,m0,nxr[1])
@@ -138,9 +138,8 @@ def OptSpace(M,rank,num_iter,tol):
 
     X = X0
     Y = Y0
-    print(np.shape(X),np.shape(Y))
     S = getoptS(X,Y,M,E)
-    dist = [np.linalg.norm(np.multiply((M - np.matmul(X,np.matmul(S,Y.T))),E.todense()))/np.sqrt(E.nnz)]
+    dist = [np.linalg.norm(np.multiply((M - np.matmul(X,np.matmul(S,Y.T))),E.todense()),'fro')/np.sqrt(E.nnz)]
     print("Initial Dist:", dist)
 
     for i in range(num_iter):
@@ -149,7 +148,7 @@ def OptSpace(M,rank,num_iter,tol):
         X = np.array(X + t * W);
         Y = np.array(Y + t * Z);
         S = getoptS(X, Y, M, E);
-        dist.append(np.linalg.norm(np.multiply((M - np.matmul(X,np.matmul(S,Y.T))),E.todense()))/np.sqrt(E.nnz))
+        dist.append(np.linalg.norm(np.multiply((M - np.matmul(X,np.matmul(S,Y.T))),E.todense()),'fro')/np.sqrt(E.nnz))
         print("At iteration",i,"the error is: ",dist[i+1])
         if (dist[i + 1] < tol):
             break;
@@ -157,17 +156,12 @@ def OptSpace(M,rank,num_iter,tol):
     return X,S,Y,dist
 
 
-indptr = np.array([0, 2, 3, 6])
-indices = np.array([0, 2, 2, 0, 1, 2])
-data = np.array([1, 2, 3, 4, 5, 6]).repeat(4).reshape(6, 2, 2)
-bsr_matrix((data,indices,indptr), shape=(6, 6)).toarray()
-
 n = 1001;
 m = 1000;
 r = 3;
 tol = 1e-8 ;
 
-np.random.seed(2)
+np.random.seed(4)
 eps = 10*r*np.log10(n);
 U = np.random.randn(n,r);
 V = np.random.randn(m,r);
