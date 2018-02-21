@@ -19,9 +19,9 @@ def G(X,m0,r):
 def F_t(X,Y,S,M,E,m0,rho):
     nxr = np.shape(X)
     out1 = sum(sum(((np.array((np.matmul(X, np.matmul(S, Y.T))) - M) * np.array(E.todense())) ** 2))) / 2
-    out2 = rho*G(Y,m0,r)
+    out2 = rho*G(Y,m0,nxr[1])
 
-    out3 = rho*G(X,m0,r)
+    out3 = rho*G(X,m0,nxr[1])
 
     return out1+out2+out3
 def getoptT(X,W,Y,Z,S,M,E,m0,rho):
@@ -155,25 +155,27 @@ def OptSpace(M,rank,num_iter,tol):
     S = S/rescal_param
     return X,S,Y,dist
 
+def TestOptspace():
+    n = 1000;
+    m = 1000;
+    r = 20;
+    tol = 1e-8 ;
 
-n = 1001;
-m = 1000;
-r = 3;
-tol = 1e-8 ;
+    np.random.seed(2)
+    eps = 10*r*np.log10(n);
+    U = np.random.randn(n,r);
+    V = np.random.randn(m,r);
+    sig = np.eye(r)
+    M0 = np.matmul(U,np.matmul(sig,V.T))
+    E = 1 - np.ceil(np.random.rand(n,m) - (eps/np.sqrt(n*m)))
 
-np.random.seed(4)
-eps = 10*r*np.log10(n);
-U = np.random.randn(n,r);
-V = np.random.randn(m,r);
-sig = np.eye(r)
-M0 = np.matmul(U,np.matmul(sig,V.T))
-E = 1 - np.ceil(np.random.rand(n,m) - (eps/np.sqrt(n*m)))
-
-M = M0 * E
-np.random.seed((int)(time.time()))
+    M = M0 * E
+    np.random.seed((int)(time.time()))
 
 
 
-X,S,Y,dist = OptSpace(M,r,10,tol)
+    X,S,Y,dist = OptSpace(M,r,10,tol)
 
-print(np.linalg.norm(np.matmul(X,np.matmul(S,Y.T)) - M0,'fro')/np.sqrt(m*n))
+    print(np.linalg.norm(np.matmul(X,np.matmul(S,Y.T)) - M0,'fro')/np.sqrt(m*n))
+    print(np.matmul(X,np.matmul(S,Y.T)) - M0)
+TestOptspace()
