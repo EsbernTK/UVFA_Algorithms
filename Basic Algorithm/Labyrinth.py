@@ -63,9 +63,9 @@ class Environment:
             for ind, neigState in enumerate(state.NeighbourStates):
                 if not neigState.Visited[demonId]:
                     self.grassFireSpread(neigState,demonId,discount,False)
-    def djikstra(self,givenState,demonId,discount):
+    def djikstra(self,givenState,demonId,discount, seed):
         self.djikstraQueue = [givenState]
-        givenState.Values[demonId] = 1
+        givenState.Values[demonId] = seed
         givenState.Visited[demonId] = True
         i = 0
         while(len(self.djikstraQueue) > 0 and i < 10000):
@@ -123,3 +123,15 @@ def MakeMatrix(n,m,numDemons):
                     if(type(val) != State):
                         state.NeighbourStates.remove(val)
     return matrix
+
+
+def RecordMatrix(matrix,name):
+    thefile = open(name + '.txt', 'w')
+    for idxY, list in enumerate(matrix):
+        for idxX, value in enumerate(list):
+            if (idxX < len(list) - 1):
+                thefile.write("%s," % matrix[idxY][idxX])
+            else:
+                thefile.write("%s" % matrix[idxY][idxX])
+        thefile.write("\n")
+    thefile.close()

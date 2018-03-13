@@ -27,13 +27,14 @@ def F_t(X,Y,S,M,E,m0,rho):
 def getoptT(X,W,Y,Z,S,M,E,m0,rho):
 
     norm2WZ = np.power(np.linalg.norm(W, 'fro'),2) + np.power(np.linalg.norm(Z, 'fro'),2);
+    #print(norm2WZ)
     f = [F_t(X,Y,S,M,E,m0,rho)]
     t = -0.1
     for i in range(20):
 
         f.append(F_t(np.array(X +t*W),np.array(Y + t*Z),S,M,E,m0,rho))
         if(f[i+1] - f[0] <= 0.5*(t)*norm2WZ):
-            print(t)
+            #print(t)
             return t;
         t /= 2
     return t
@@ -68,6 +69,7 @@ def Gp(X,m0,r):
 def gradF_t(X,Y,S,M,E,m0,rho):
     nxr = np.shape(X)
     mxr = np.shape(Y)
+
 
     XS = np.matmul(X,S)
     YS = np.matmul(Y,S.T)
@@ -156,9 +158,9 @@ def OptSpace(M,rank,num_iter,tol):
     return X,S,Y,dist
 
 def TestOptspace():
-    n = 1000;
+    n = 1001;
     m = 1000;
-    r = 20;
+    r = 7;
     tol = 1e-8 ;
 
     np.random.seed(2)
@@ -167,15 +169,34 @@ def TestOptspace():
     V = np.random.randn(m,r);
     sig = np.eye(r)
     M0 = np.matmul(U,np.matmul(sig,V.T))
+    thefile = open('testFull.txt', 'w')
+    for idxY, list in enumerate(M0):
+        for idxX, value in enumerate(list):
+            if (idxX < len(list) - 1):
+                thefile.write("%s," % value)
+            else:
+                thefile.write("%s" % value)
+        thefile.write("\n")
+    thefile.close()
     E = 1 - np.ceil(np.random.rand(n,m) - (eps/np.sqrt(n*m)))
 
     M = M0 * E
+
+    thefile = open('testSparse.txt', 'w')
+    for idxY, list in enumerate(M0):
+        for idxX, value in enumerate(list):
+            if (idxX < len(list) - 1):
+                thefile.write("%s," % value)
+            else:
+                thefile.write("%s" % value)
+        thefile.write("\n")
+    thefile.close()
+
     np.random.seed((int)(time.time()))
 
-
+    print(M)
 
     X,S,Y,dist = OptSpace(M,r,10,tol)
 
     print(np.linalg.norm(np.matmul(X,np.matmul(S,Y.T)) - M0,'fro')/np.sqrt(m*n))
     print(np.matmul(X,np.matmul(S,Y.T)) - M0)
-TestOptspace()
